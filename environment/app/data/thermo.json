@@ -1,0 +1,14 @@
+{
+  "reference_temperature_k": 298.15,
+  "gas_species": ["CH4", "H2O", "CO", "CO2", "H2", "N2"],
+  "solid_species": "C",
+  "species": {
+    "CH4": {"h_f_kj_mol": -74.6, "s_j_mol_k": 186.3, "cp_j_mol_k": 35.7},
+    "H2O": {"h_f_kj_mol": -241.8, "s_j_mol_k": 188.8, "cp_j_mol_k": 33.6},
+    "CO": {"h_f_kj_mol": -110.5, "s_j_mol_k": 197.7, "cp_j_mol_k": 29.1},
+    "CO2": {"h_f_kj_mol": -393.5, "s_j_mol_k": 213.8, "cp_j_mol_k": 37.1},
+    "H2": {"h_f_kj_mol": 0.0, "s_j_mol_k": 130.7, "cp_j_mol_k": 28.8},
+    "N2": {"h_f_kj_mol": 0.0, "s_j_mol_k": 191.6, "cp_j_mol_k": 29.1},
+    "C": {"h_f_kj_mol": 0.0, "s_j_mol_k": 5.7, "cp_j_mol_k": 8.5}
+  }
+}
