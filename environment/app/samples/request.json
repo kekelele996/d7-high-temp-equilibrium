@@ -24,7 +24,7 @@
     },
     {
       "kind": "pressure",
-      "pressure_bar": 28.0,
+      "pressure_bar": 20.0,
       "temperature_k": 1100,
       "feed_mol": {
         "CH4": 0.1,

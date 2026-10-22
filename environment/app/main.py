@@ -343,17 +343,15 @@ def calibrate(runs):
                 moles[i] * SPECIES[NAMES[i]]["h_f_kj_mol"] * 1000.0
                 for i in range(6)
             )
-            total_feed = sum(feed.values())
-            effective_cp = sum(
-                feed[name] * SPECIES[name]["cp_j_mol_k"] for name in NAMES
-            ) / total_feed
-            sensible = sum(moles) * effective_cp * (temperature - TREF)
+            sensible = sum(
+                moles[i] * SPECIES[NAMES[i]]["cp_j_mol_k"] * (temperature - TREF)
+                for i in range(6)
+            )
             if abs(sensible) > 1.0e-12:
                 heat_capacity_values.append((inlet_h - formation) / sensible)
         elif kind == "carbon":
             solid = float(run["solid_carbon_mol"])
             if solid <= 1.0e-6:
-                carbon_values.append(0.0)
                 continue
             temperature = float(run["temperature_k"])
             pressure = float(run["pressure_bar"])
@@ -370,7 +368,7 @@ def calibrate(runs):
         raise ValueError("calibration runs do not identify all model parameters")
     return {
         "pressure_exponent": statistics.mean(pressure_values),
-        "heat_capacity_scale": statistics.median(heat_capacity_values),
+        "heat_capacity_scale": statistics.mean(heat_capacity_values),
         "carbon_entropy_shift_j_mol_k": statistics.mean(carbon_values),
     }
 

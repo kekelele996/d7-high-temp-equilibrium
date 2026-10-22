@@ -142,7 +142,7 @@
         "H2": 0.02,
         "N2": 0.31
       },
-      "outlet_temperature_k": 864.7075435566708,
+      "outlet_temperature_k": 889.7075435566708,
       "outlet_gas_mol": {
         "CH4": 0.010561970351982551,
         "H2O": 0.15612185956580876,
@@ -239,7 +239,7 @@
     },
     {
       "kind": "carbon",
-      "pressure_bar": 1.0,
+      "pressure_bar": 1.4,
       "temperature_k": 700,
       "feed_mol": {
         "CH4": 0.5,

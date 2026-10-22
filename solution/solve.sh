@@ -10,37 +10,19 @@ import os
 import sys
 from pathlib import Path
 
-FIXED_PRESSURE = '''        "pressure_exponent": statistics.median(pressure_values),
-'''
-ORIGINAL_PRESSURE = '''        "pressure_exponent": statistics.mean(pressure_values),
-'''
-
-FIXED_HEAT_CAPACITY = '''            sensible = sum(
-                moles[i] * SPECIES[NAMES[i]]["cp_j_mol_k"] * (temperature - TREF)
-                for i in range(6)
-            )
-'''
-ORIGINAL_HEAT_CAPACITY = '''            total_feed = sum(feed.values())
-            effective_cp = sum(
-                feed[name] * SPECIES[name]["cp_j_mol_k"] for name in NAMES
-            ) / total_feed
-            sensible = sum(moles) * effective_cp * (temperature - TREF)
-'''
-
-FIXED_CARBON = '''            solid = float(run["solid_carbon_mol"])
-            if solid <= 1.0e-6:
-                continue
-'''
-ORIGINAL_CARBON = '''            solid = float(run["solid_carbon_mol"])
-            if solid <= 1.0e-6:
-                carbon_values.append(0.0)
-                continue
-'''
-
 REVERT = {
-    "difficulty_1": (FIXED_PRESSURE, ORIGINAL_PRESSURE),
-    "difficulty_2": (FIXED_HEAT_CAPACITY, ORIGINAL_HEAT_CAPACITY),
-    "difficulty_3": (FIXED_CARBON, ORIGINAL_CARBON),
+    "difficulty_1": (
+        '        "pressure_exponent": statistics.median(pressure_values),\n',
+        '        "pressure_exponent": statistics.mean(pressure_values),\n',
+    ),
+    "difficulty_2": (
+        '        "heat_capacity_scale": statistics.median(heat_capacity_values),\n',
+        '        "heat_capacity_scale": statistics.mean(heat_capacity_values),\n',
+    ),
+    "difficulty_3": (
+        '        "carbon_entropy_shift_j_mol_k": statistics.median(carbon_values),\n',
+        '        "carbon_entropy_shift_j_mol_k": statistics.mean(carbon_values),\n',
+    ),
 }
 skip = [item for item in os.environ.get("SKIP", "").split(",") if item]
 unknown = sorted(set(skip) - set(REVERT))
