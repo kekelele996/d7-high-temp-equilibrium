@@ -1,5 +1,5 @@
 # 基础镜像按补丁版本 + digest 双重锁定；换镜像时用 docker buildx imagetools inspect 取多架构 index digest。
-FROM python:3.12.7-slim-bookworm@sha256:60d9996b6a8a3689d36db740b49f4327be3be09a21122bd02fb8895abb38b50d
+FROM python:3.11-slim@sha256:0dd364ba7e10242f07755449e3a3d0e35f9efd987952737b90def6709ab0c5ce
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

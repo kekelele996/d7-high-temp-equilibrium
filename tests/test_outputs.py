@@ -71,13 +71,6 @@ def request(mode, pressure, feed, temperature=None, inlet=None):
     return payload
 
 
-def expect_fraction(report_value, expected, keys):
-    got = report_value["gas_mole_fractions"]
-    assert set(got) == set(NAMES)
-    for key in keys:
-        assert abs(got[key] - expected[key]) <= FRACTION_TOL, (key, got[key], expected[key])
-
-
 CASE_D1_A = request(
     "isothermal", 30.0,
     {"CH4": 0.18, "H2O": 0.24, "CO": 0.08, "CO2": 0.02, "H2": 0.03, "N2": 0.45},
@@ -145,17 +138,31 @@ def test_wrong_argument_count_exits_2():
 
 def test_high_pressure_case_a_keeps_reforming_products():
     """「反应器是封闭系统，碳、氢、氧、氮的元素总量在反应前后保持不变」"""
-    expect_fraction(report(CASE_D1_A), D1_A, ["CH4", "H2O", "CO", "H2"])
+    got = report(CASE_D1_A)["gas_mole_fractions"]
+    assert set(got) == set(NAMES)
+    assert abs(got["CH4"] - D1_A["CH4"]) <= FRACTION_TOL
+    assert abs(got["H2O"] - D1_A["H2O"]) <= FRACTION_TOL
+    assert abs(got["CO"] - D1_A["CO"]) <= FRACTION_TOL
+    assert abs(got["H2"] - D1_A["H2"]) <= FRACTION_TOL
 
 
 def test_high_pressure_case_b_keeps_shift_products():
     """「以 1 bar 为标准压力，所有气相按理想气体处理」"""
-    expect_fraction(report(CASE_D1_B), D1_B, ["CH4", "H2O", "CO", "H2"])
+    got = report(CASE_D1_B)["gas_mole_fractions"]
+    assert abs(got["CH4"] - D1_B["CH4"]) <= FRACTION_TOL
+    assert abs(got["H2O"] - D1_B["H2O"]) <= FRACTION_TOL
+    assert abs(got["CO"] - D1_B["CO"]) <= FRACTION_TOL
+    assert abs(got["H2"] - D1_B["H2"]) <= FRACTION_TOL
 
 
 def test_high_pressure_case_c_keeps_mole_fractions_normalized():
     """「六项之和为 1」"""
-    expect_fraction(report(CASE_D1_C), D1_C, ["CH4", "H2O", "CO", "H2"])
+    got = report(CASE_D1_C)["gas_mole_fractions"]
+    assert abs(sum(got.values()) - 1.0) <= 1.0e-10
+    assert abs(got["CH4"] - D1_C["CH4"]) <= FRACTION_TOL
+    assert abs(got["H2O"] - D1_C["H2O"]) <= FRACTION_TOL
+    assert abs(got["CO"] - D1_C["CO"]) <= FRACTION_TOL
+    assert abs(got["H2"] - D1_C["H2"]) <= FRACTION_TOL
 
 
 def test_adiabatic_case_a_matches_energy_balance():
@@ -180,7 +187,9 @@ def test_carbon_case_a_releases_solid_carbon():
     """「富碳进料析出固碳后，气相组成仍须满足平衡条件」"""
     got = report(CASE_D3_A)
     assert abs(got["solid_carbon_mol"] - 0.1230158801) <= CARBON_TOL
-    expect_fraction(got, D3_A_Y, ["CH4", "H2O", "H2"])
+    assert abs(got["gas_mole_fractions"]["CH4"] - D3_A_Y["CH4"]) <= FRACTION_TOL
+    assert abs(got["gas_mole_fractions"]["H2O"] - D3_A_Y["H2O"]) <= FRACTION_TOL
+    assert abs(got["gas_mole_fractions"]["H2"] - D3_A_Y["H2"]) <= FRACTION_TOL
 
 
 def test_carbon_case_b_releases_solid_carbon():
@@ -193,4 +202,6 @@ def test_carbon_case_c_releases_solid_carbon():
     """「富碳进料析出固碳后，气相组成仍须满足平衡条件」"""
     got = report(CASE_D3_C)
     assert abs(got["solid_carbon_mol"] - 0.2689412792) <= CARBON_TOL
-    expect_fraction(got, D3_C_Y, ["CH4", "H2", "N2"])
+    assert abs(got["gas_mole_fractions"]["CH4"] - D3_C_Y["CH4"]) <= FRACTION_TOL
+    assert abs(got["gas_mole_fractions"]["H2"] - D3_C_Y["H2"]) <= FRACTION_TOL
+    assert abs(got["gas_mole_fractions"]["N2"] - D3_C_Y["N2"]) <= FRACTION_TOL
