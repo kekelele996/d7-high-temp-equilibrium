@@ -3,8 +3,8 @@ artifacts = []
 
 [task]
 name = "local/d7-high-temp-equilibrium"
-description = "高温转化气平衡组成与绝热温度"
-keywords = ["d.7", "chemistry", "chemical-equilibrium", "high-temperature", "solid-carbon"]
+description = "高温转化气有效模型参数标定与工况预测"
+keywords = ["d.7", "chemistry", "chemical-equilibrium", "model-calibration", "solid-carbon"]
 [[task.authors]]
 name = "海德威"
 

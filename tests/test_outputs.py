@@ -1,11 +1,6 @@
-"""高温转化气平衡报告的验收测试。
-
-测试输入在临时目录中生成。期望值来自 research/ 中的独立复核记录，不从
-solution/ 或候选输出生成。候选程序始终以 runner 身份运行。
-"""
+"""Pilot-reactor calibration and equilibrium prediction acceptance tests."""
 
 import json
-import math
 import os
 import signal
 import subprocess
@@ -21,11 +16,15 @@ CANDIDATE_ENV = {
     "LANG": "C.UTF-8",
     "TZ": "UTC",
 }
-CALL_TIMEOUT_SEC = 120
-NAMES = ["CH4", "H2O", "CO", "CO2", "H2", "N2"]
+CALL_TIMEOUT_SEC = 180
+FIXTURES = Path(__file__).with_name("fixtures")
+EXPECTED = json.loads((FIXTURES / "expected.json").read_text(encoding="utf-8"))
+PARAM_TOL = 1.0e-2
+CP_TOL = 5.0e-3
+ENTROPY_TOL = 0.2
 FRACTION_TOL = 2.0e-5
 TEMPERATURE_TOL = 0.5
-CARBON_TOL = 5.0e-4
+CARBON_TOL = 2.0e-3
 
 
 def run_candidate(*args, timeout=CALL_TIMEOUT_SEC):
@@ -51,82 +50,26 @@ def run_candidate(*args, timeout=CALL_TIMEOUT_SEC):
     return subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
 
 
-def report(request):
-    folder = Path(tempfile.mkdtemp(prefix="equilibrium-"))
+def run_bundle(name):
+    source = FIXTURES / f"{name}.json"
+    folder = Path(tempfile.mkdtemp(prefix="calibration-"))
     folder.chmod(0o755)
     case = folder / "request.json"
-    case.write_text(json.dumps(request), encoding="utf-8")
+    case.write_bytes(source.read_bytes())
     case.chmod(0o644)
     proc = run_candidate(case)
     assert proc.returncode == 0, f"exit={proc.returncode} stderr={proc.stderr[-500:]}"
     return json.loads(proc.stdout)
 
 
-def request(mode, pressure, feed, temperature=None, inlet=None):
-    payload = {"mode": mode, "pressure_bar": pressure, "feed_mol": feed}
-    if temperature is not None:
-        payload["temperature_k"] = temperature
-    if inlet is not None:
-        payload["inlet_temperature_k"] = inlet
-    return payload
-
-
-CASE_D1_A = request(
-    "isothermal", 30.0,
-    {"CH4": 0.18, "H2O": 0.24, "CO": 0.08, "CO2": 0.02, "H2": 0.03, "N2": 0.45},
-    temperature=1100.0,
-)
-D1_A = {"CH4": 0.0584223050, "H2O": 0.0932638607, "CO": 0.1406611052,
-        "CO2": 0.0308551860, "H2": 0.3072533707, "N2": 0.3695441724}
-
-CASE_D1_B = request(
-    "isothermal", 50.0,
-    {"CH4": 0.20, "H2O": 0.30, "CO": 0.05, "CO2": 0.03, "H2": 0.02, "N2": 0.40},
-    temperature=1000.0,
-)
-D1_B = {"CH4": 0.1312515852, "H2O": 0.1868862792, "CO": 0.0596513055,
-        "CO2": 0.0615977433, "H2": 0.1998978952, "N2": 0.3607151916}
-
-CASE_D1_C = request(
-    "isothermal", 20.0,
-    {"CH4": 0.25, "H2O": 0.35, "CO": 0.03, "CO2": 0.02, "H2": 0.02, "N2": 0.33},
-    temperature=1000.0,
-)
-D1_C = {"CH4": 0.1184814176, "H2O": 0.1691038203, "CO": 0.0805765253,
-        "CO2": 0.0483346241, "H2": 0.3113717888, "N2": 0.2721318238}
-
-CASE_D2_A = request(
-    "adiabatic", 1.0,
-    {"CH4": 0.02, "H2O": 0.32, "CO": 0.22, "CO2": 0.04, "H2": 0.03, "N2": 0.37},
-    inlet=700.0,
-)
-CASE_D2_B = request(
-    "adiabatic", 1.0,
-    {"CH4": 0.01, "H2O": 0.34, "CO": 0.30, "CO2": 0.02, "H2": 0.02, "N2": 0.31},
-    inlet=700.0,
-)
-CASE_D2_C = request(
-    "adiabatic", 1.0,
-    {"CH4": 0.04, "H2O": 0.30, "CO": 0.25, "CO2": 0.03, "H2": 0.04, "N2": 0.34},
-    inlet=800.0,
-)
-
-CARBON_FEED = {"CH4": 0.45, "H2O": 0.05, "CO": 0.04, "CO2": 0.01, "H2": 0.02, "N2": 0.43}
-CASE_D3_A = request("isothermal", 1.0, CARBON_FEED, temperature=650.0)
-CASE_D3_B = request("isothermal", 1.0, CARBON_FEED, temperature=700.0)
-CASE_D3_C = request("isothermal", 1.0, CARBON_FEED, temperature=800.0)
-D3_A_Y = {"CH4": 0.3606940340, "H2O": 0.0979221747, "CO": 0.0003546754,
-          "CO2": 0.0041408039, "H2": 0.1203416131, "N2": 0.4165466989}
-D3_B_Y = {"CH4": 0.3070535656, "H2O": 0.0911877004, "CO": 0.0012436567,
-          "CO2": 0.0048918179, "H2": 0.1960555600, "N2": 0.3995676994}
-D3_C_Y = {"CH4": 0.1758441628, "H2O": 0.0693473898, "CO": 0.0094652567,
-          "CO2": 0.0061731871, "H2": 0.3828211041, "N2": 0.3563488994}
-
-
-def test_prints_json_with_exact_fields():
-    """「程序向标准输出写一个 JSON 对象，只含四个字段」"""
-    got = report(request("isothermal", 1.0, CARBON_FEED, temperature=1100.0))
-    assert set(got) == {"temperature_k", "gas_mol", "gas_mole_fractions", "solid_carbon_mol"}
+def test_prints_exact_calibration_and_prediction_fields():
+    """「输出对象只含 `calibration` 和 `predictions` 两个字段」"""
+    got = run_bundle("bundle-a")
+    assert set(got) == {"calibration", "predictions"}
+    assert set(got["calibration"]) == {
+        "pressure_exponent", "heat_capacity_scale", "carbon_entropy_shift_j_mol_k"
+    }
+    assert set(got["predictions"]) == {"pressure", "energy", "carbon"}
 
 
 def test_wrong_argument_count_exits_2():
@@ -136,72 +79,70 @@ def test_wrong_argument_count_exits_2():
     assert proc.stdout.strip() == ""
 
 
-def test_high_pressure_case_a_keeps_reforming_products():
-    """「反应器是封闭系统，碳、氢、氧、氮的元素总量在反应前后保持不变」"""
-    got = report(CASE_D1_A)["gas_mole_fractions"]
-    assert set(got) == set(NAMES)
-    assert abs(got["CH4"] - D1_A["CH4"]) <= FRACTION_TOL
-    assert abs(got["H2O"] - D1_A["H2O"]) <= FRACTION_TOL
-    assert abs(got["CO"] - D1_A["CO"]) <= FRACTION_TOL
-    assert abs(got["H2"] - D1_A["H2"]) <= FRACTION_TOL
+def test_bundle_a_recovers_pressure_behavior():
+    """「压力系数用于还原高压运行中的气相平衡组成」"""
+    got = run_bundle("bundle-a")
+    assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-a"]["pressure_exponent"]) <= PARAM_TOL
+    fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
+    assert abs(fractions["CH4"] - EXPECTED["bundle-a"]["pressure_ch4_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["H2"] - EXPECTED["bundle-a"]["pressure_h2_fraction"]) <= FRACTION_TOL
 
 
-def test_high_pressure_case_b_keeps_shift_products():
-    """「以 1 bar 为标准压力，所有气相按理想气体处理」"""
-    got = report(CASE_D1_B)["gas_mole_fractions"]
-    assert abs(got["CH4"] - D1_B["CH4"]) <= FRACTION_TOL
-    assert abs(got["H2O"] - D1_B["H2O"]) <= FRACTION_TOL
-    assert abs(got["CO"] - D1_B["CO"]) <= FRACTION_TOL
-    assert abs(got["H2"] - D1_B["H2"]) <= FRACTION_TOL
+def test_bundle_b_recovers_pressure_behavior():
+    """「压力系数用于还原高压运行中的气相平衡组成」"""
+    got = run_bundle("bundle-b")
+    assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-b"]["pressure_exponent"]) <= PARAM_TOL
+    fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
+    assert abs(fractions["CH4"] - EXPECTED["bundle-b"]["pressure_ch4_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["H2"] - EXPECTED["bundle-b"]["pressure_h2_fraction"]) <= FRACTION_TOL
 
 
-def test_high_pressure_case_c_keeps_mole_fractions_normalized():
-    """「六项之和为 1」"""
-    got = report(CASE_D1_C)["gas_mole_fractions"]
-    assert abs(sum(got.values()) - 1.0) <= 1.0e-10
-    assert abs(got["CH4"] - D1_C["CH4"]) <= FRACTION_TOL
-    assert abs(got["H2O"] - D1_C["H2O"]) <= FRACTION_TOL
-    assert abs(got["CO"] - D1_C["CO"]) <= FRACTION_TOL
-    assert abs(got["H2"] - D1_C["H2"]) <= FRACTION_TOL
+def test_bundle_c_recovers_pressure_behavior():
+    """「压力系数用于还原高压运行中的气相平衡组成」"""
+    got = run_bundle("bundle-c")
+    assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-c"]["pressure_exponent"]) <= PARAM_TOL
+    fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
+    assert abs(fractions["CH4"] - EXPECTED["bundle-c"]["pressure_ch4_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["H2"] - EXPECTED["bundle-c"]["pressure_h2_fraction"]) <= FRACTION_TOL
 
 
-def test_adiabatic_case_a_matches_energy_balance():
-    """「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
-    got = report(CASE_D2_A)
-    assert abs(got["temperature_k"] - 841.6158237) <= TEMPERATURE_TOL
+def test_bundle_a_recovers_heat_capacity_scale():
+    """「产物热容系数用于还原绝热出口温度」"""
+    got = run_bundle("bundle-a")
+    assert abs(got["calibration"]["heat_capacity_scale"] - EXPECTED["bundle-a"]["heat_capacity_scale"]) <= CP_TOL
+    assert abs(got["predictions"]["energy"]["temperature_k"] - EXPECTED["bundle-a"]["energy_temperature_k"]) <= TEMPERATURE_TOL
 
 
-def test_adiabatic_case_b_matches_energy_balance():
-    """「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
-    got = report(CASE_D2_B)
-    assert abs(got["temperature_k"] - 888.4147162) <= TEMPERATURE_TOL
+def test_bundle_b_recovers_heat_capacity_scale():
+    """「产物热容系数用于还原绝热出口温度」"""
+    got = run_bundle("bundle-b")
+    assert abs(got["calibration"]["heat_capacity_scale"] - EXPECTED["bundle-b"]["heat_capacity_scale"]) <= CP_TOL
+    assert abs(got["predictions"]["energy"]["temperature_k"] - EXPECTED["bundle-b"]["energy_temperature_k"]) <= TEMPERATURE_TOL
 
 
-def test_adiabatic_case_c_matches_energy_balance():
-    """「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
-    got = report(CASE_D2_C)
-    assert abs(got["temperature_k"] - 858.3192376) <= TEMPERATURE_TOL
+def test_bundle_c_recovers_heat_capacity_scale():
+    """「产物热容系数用于还原绝热出口温度」"""
+    got = run_bundle("bundle-c")
+    assert abs(got["calibration"]["heat_capacity_scale"] - EXPECTED["bundle-c"]["heat_capacity_scale"]) <= CP_TOL
+    assert abs(got["predictions"]["energy"]["temperature_k"] - EXPECTED["bundle-c"]["energy_temperature_k"]) <= TEMPERATURE_TOL
 
 
-def test_carbon_case_a_releases_solid_carbon():
-    """「富碳进料析出固碳后，气相组成仍须满足平衡条件」"""
-    got = report(CASE_D3_A)
-    assert abs(got["solid_carbon_mol"] - 0.1230158801) <= CARBON_TOL
-    assert abs(got["gas_mole_fractions"]["CH4"] - D3_A_Y["CH4"]) <= FRACTION_TOL
-    assert abs(got["gas_mole_fractions"]["H2O"] - D3_A_Y["H2O"]) <= FRACTION_TOL
-    assert abs(got["gas_mole_fractions"]["H2"] - D3_A_Y["H2"]) <= FRACTION_TOL
+def test_bundle_a_recovers_carbon_boundary():
+    """「固碳项必须与实测固碳量和气相组成同时一致」"""
+    got = run_bundle("bundle-a")
+    assert abs(got["calibration"]["carbon_entropy_shift_j_mol_k"] - EXPECTED["bundle-a"]["carbon_entropy_shift_j_mol_k"]) <= ENTROPY_TOL
+    assert abs(got["predictions"]["carbon"]["solid_carbon_mol"] - EXPECTED["bundle-a"]["carbon_solid_mol"]) <= CARBON_TOL
 
 
-def test_carbon_case_b_releases_solid_carbon():
-    """「富碳进料析出固碳后，气相组成仍须满足平衡条件」"""
-    got = report(CASE_D3_B)
-    assert abs(got["solid_carbon_mol"] - 0.1629575226) <= CARBON_TOL
+def test_bundle_b_recovers_carbon_boundary():
+    """「固碳项必须与实测固碳量和气相组成同时一致」"""
+    got = run_bundle("bundle-b")
+    assert abs(got["calibration"]["carbon_entropy_shift_j_mol_k"] - EXPECTED["bundle-b"]["carbon_entropy_shift_j_mol_k"]) <= ENTROPY_TOL
+    assert abs(got["predictions"]["carbon"]["solid_carbon_mol"] - EXPECTED["bundle-b"]["carbon_solid_mol"]) <= CARBON_TOL
 
 
-def test_carbon_case_c_releases_solid_carbon():
-    """「富碳进料析出固碳后，气相组成仍须满足平衡条件」"""
-    got = report(CASE_D3_C)
-    assert abs(got["solid_carbon_mol"] - 0.2689412792) <= CARBON_TOL
-    assert abs(got["gas_mole_fractions"]["CH4"] - D3_C_Y["CH4"]) <= FRACTION_TOL
-    assert abs(got["gas_mole_fractions"]["H2"] - D3_C_Y["H2"]) <= FRACTION_TOL
-    assert abs(got["gas_mole_fractions"]["N2"] - D3_C_Y["N2"]) <= FRACTION_TOL
+def test_bundle_c_recovers_carbon_boundary():
+    """「固碳项必须与实测固碳量和气相组成同时一致」"""
+    got = run_bundle("bundle-c")
+    assert abs(got["calibration"]["carbon_entropy_shift_j_mol_k"] - EXPECTED["bundle-c"]["carbon_entropy_shift_j_mol_k"]) <= ENTROPY_TOL
+    assert abs(got["predictions"]["carbon"]["solid_carbon_mol"] - EXPECTED["bundle-c"]["carbon_solid_mol"]) <= CARBON_TOL

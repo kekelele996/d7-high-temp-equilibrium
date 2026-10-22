@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
   "gate_tests": [
-    "test_outputs.py::test_prints_json_with_exact_fields",
+    "test_outputs.py::test_prints_exact_calibration_and_prediction_fields",
     "test_outputs.py::test_wrong_argument_count_exits_2"
   ],
   "tests": {
-    "test_outputs.py::test_high_pressure_case_a_keeps_reforming_products": {"weight": 0.14, "rationale": "压力基准与总摩尔数共同决定高压组成，是主结果，难点1合计0.40"},
-    "test_outputs.py::test_high_pressure_case_b_keeps_shift_products": {"weight": 0.13, "rationale": "第二种高压进料确认压力口径可迁移"},
-    "test_outputs.py::test_high_pressure_case_c_keeps_mole_fractions_normalized": {"weight": 0.13, "rationale": "第三种高压进料同时检查归一化与组成"},
-    "test_outputs.py::test_adiabatic_case_a_matches_energy_balance": {"weight": 0.10, "rationale": "绝热出口温度是能量衡算核心，难点2合计0.30"},
-    "test_outputs.py::test_adiabatic_case_b_matches_energy_balance": {"weight": 0.10, "rationale": "第二种绝热进料覆盖不同产物热容组成"},
-    "test_outputs.py::test_adiabatic_case_c_matches_energy_balance": {"weight": 0.10, "rationale": "第三种绝热进料覆盖另一温度区间"},
-    "test_outputs.py::test_carbon_case_a_releases_solid_carbon": {"weight": 0.10, "rationale": "固碳量与气相组成必须由同一相平衡闭合，难点3合计0.30"},
-    "test_outputs.py::test_carbon_case_b_releases_solid_carbon": {"weight": 0.10, "rationale": "中温富碳工况检查固碳量"},
-    "test_outputs.py::test_carbon_case_c_releases_solid_carbon": {"weight": 0.10, "rationale": "高温富碳工况检查固碳量与气相组成"}
+    "test_outputs.py::test_bundle_a_recovers_pressure_behavior": {"weight": 0.14, "rationale": "高压有效压力系数与目标组成，是主交付结果，难点1合计0.40"},
+    "test_outputs.py::test_bundle_b_recovers_pressure_behavior": {"weight": 0.13, "rationale": "第二组高压工况确认反演结果可迁移"},
+    "test_outputs.py::test_bundle_c_recovers_pressure_behavior": {"weight": 0.13, "rationale": "第三组压力与进料检查参数与组成同时闭合"},
+    "test_outputs.py::test_bundle_a_recovers_heat_capacity_scale": {"weight": 0.10, "rationale": "产物热容系数与绝热温度，难点2合计0.30"},
+    "test_outputs.py::test_bundle_b_recovers_heat_capacity_scale": {"weight": 0.10, "rationale": "第二组绝热工况覆盖不同产物组成"},
+    "test_outputs.py::test_bundle_c_recovers_heat_capacity_scale": {"weight": 0.10, "rationale": "第三组绝热工况覆盖另一温度区间"},
+    "test_outputs.py::test_bundle_a_recovers_carbon_boundary": {"weight": 0.10, "rationale": "固碳项与析碳量，难点3合计0.30"},
+    "test_outputs.py::test_bundle_b_recovers_carbon_boundary": {"weight": 0.10, "rationale": "第二组富碳工况检查相边界"},
+    "test_outputs.py::test_bundle_c_recovers_carbon_boundary": {"weight": 0.10, "rationale": "第三组富碳工况检查目标预测"}
   }
 }

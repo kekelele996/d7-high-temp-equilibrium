@@ -1,0 +1,29 @@
+{
+  "bundle-a": {
+    "pressure_exponent": 1.82,
+    "heat_capacity_scale": 1.13,
+    "carbon_entropy_shift_j_mol_k": 8.0,
+    "pressure_ch4_fraction": 0.0036230335368906156,
+    "pressure_h2_fraction": 0.29179931062373243,
+    "energy_temperature_k": 842.2838772435234,
+    "carbon_solid_mol": 0.11342734939978663
+  },
+  "bundle-b": {
+    "pressure_exponent": 1.82,
+    "heat_capacity_scale": 1.13,
+    "carbon_entropy_shift_j_mol_k": 8.0,
+    "pressure_ch4_fraction": 0.00017154971307160928,
+    "pressure_h2_fraction": 0.3013764590605558,
+    "energy_temperature_k": 871.5364556424054,
+    "carbon_solid_mol": 0.11114277880318296
+  },
+  "bundle-c": {
+    "pressure_exponent": 1.82,
+    "heat_capacity_scale": 1.13,
+    "carbon_entropy_shift_j_mol_k": 8.0,
+    "pressure_ch4_fraction": 0.0006020797114183153,
+    "pressure_h2_fraction": 0.21999523089261327,
+    "energy_temperature_k": 906.3614854345203,
+    "carbon_solid_mol": 0.07727223824056267
+  }
+}

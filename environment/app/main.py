@@ -5,6 +5,7 @@ Usage: python3 /app/main.py <request.json>
 
 import json
 import math
+import statistics
 import sys
 from pathlib import Path
 
@@ -39,12 +40,15 @@ def load_thermo():
 
 
 THERMO, SPECIES, TREF = load_thermo()
+MODEL = {"pressure_exponent": 2.0, "heat_capacity_scale": 1.0, "carbon_entropy_shift_j_mol_k": 0.0}
 
 
 def reaction_ln_k(index, temperature):
     reaction = REACTIONS[index]
     dh = reaction["dh"] + reaction["dcp"] * (temperature - TREF)
     ds = reaction["ds"] + reaction["dcp"] * math.log(temperature / TREF)
+    if index == 2:
+        ds += MODEL["carbon_entropy_shift_j_mol_k"]
     return -dh / (R * temperature) + ds / R
 
 
@@ -70,7 +74,7 @@ def homogeneous_residuals(feed, temperature, pressure_bar, x1, x2, solid):
     if min(moles) <= 0.0:
         return None
     y = [value / total for value in moles]
-    pressure_log = math.log(pressure_bar)
+    pressure_log = MODEL["pressure_exponent"] * math.log(pressure_bar)
     reforming = (
         math.log(y[2] * y[4] ** 3 / (y[0] * y[1]))
         + pressure_log
@@ -162,23 +166,49 @@ def carbon_drive(feed, temperature, pressure_bar, x1, x2, solid):
 
 
 def settle_solid_carbon(feed, temperature, pressure_bar):
-    x1, x2 = solve_extents(feed, temperature, pressure_bar, 0.0)
-    drive = carbon_drive(feed, temperature, pressure_bar, x1, x2, 0.0)
-    if drive is None or drive <= 0.0:
-        return x1, x2, 0.0
+    base_extents = solve_extents(feed, temperature, pressure_bar, 0.0)
+    base_drive = carbon_drive(feed, temperature, pressure_bar, *base_extents, 0.0)
+    if base_drive is None or base_drive <= 0.0:
+        return base_extents[0], base_extents[1], 0.0
 
-    solid = 0.0
-    for _ in range(32):
-        moles = gas_moles(feed, x1, x2, solid)
-        total = sum(moles)
-        target_co = math.sqrt(
-            max(0.0, math.exp(reaction_ln_k(2, temperature)) * moles[3] * total / pressure_bar)
-        )
-        step = 0.5 * (moles[2] - target_co)
-        if step <= 1.0e-15:
-            break
-        solid += step
-    return x1, x2, max(0.0, solid)
+    carbon_total = feed["CH4"] + feed["CO"] + feed["CO2"]
+    upper_limit = carbon_total * 0.8
+    previous = (0.0, base_drive)
+    bracket = None
+    for index in range(1, 241):
+        solid = upper_limit * index / 240.0
+        try:
+            extents = solve_extents(feed, temperature, pressure_bar, solid)
+        except ValueError:
+            previous = None
+            continue
+        drive = carbon_drive(feed, temperature, pressure_bar, *extents, solid)
+        if drive is None:
+            previous = None
+            continue
+        if drive <= 0.0:
+            if previous is not None:
+                bracket = (previous[0], solid)
+                break
+            raise ValueError("solid-carbon boundary is not bracketed")
+        previous = (solid, drive)
+    if bracket is None:
+        raise ValueError("solid-carbon boundary is not bounded")
+
+    lower, upper = bracket
+    for _ in range(80):
+        middle = 0.5 * (lower + upper)
+        extents = solve_extents(feed, temperature, pressure_bar, middle)
+        drive = carbon_drive(feed, temperature, pressure_bar, *extents, middle)
+        if drive is None:
+            raise ValueError("solid-carbon search left the valid region")
+        if drive > 0.0:
+            lower = middle
+        else:
+            upper = middle
+    solid = 0.5 * (lower + upper)
+    extents = solve_extents(feed, temperature, pressure_bar, solid)
+    return extents[0], extents[1], solid
 
 
 def solve_equilibrium(feed, temperature, pressure_bar):
@@ -194,10 +224,12 @@ def feed_enthalpy(feed, temperature):
 
 
 def product_enthalpy(feed, temperature, moles, solid):
-    total_feed = sum(feed.values())
-    heat_capacity = sum(feed[name] * SPECIES[name]["cp_j_mol_k"] for name in NAMES) / total_feed
     formation = sum(moles[i] * SPECIES[NAMES[i]]["h_f_kj_mol"] * 1000.0 for i in range(6))
-    sensible = sum(moles) * heat_capacity * (temperature - TREF)
+    sensible = sum(
+        moles[i] * SPECIES[NAMES[i]]["cp_j_mol_k"] * (temperature - TREF)
+        for i in range(6)
+    )
+    sensible *= MODEL["heat_capacity_scale"]
     solid_sensible = solid * SPECIES["C"]["cp_j_mol_k"] * (temperature - TREF)
     return formation + sensible + solid_sensible
 
@@ -244,7 +276,7 @@ def validate(request):
     return request["mode"], float(pressure), values
 
 
-def build_report(request):
+def predict_one(request):
     mode, pressure, feed = validate(request)
     if mode == "isothermal":
         temperature = request.get("temperature_k")
@@ -268,13 +300,102 @@ def build_report(request):
     }
 
 
+def number_vector(mapping):
+    if not isinstance(mapping, dict) or set(mapping) != set(NAMES):
+        raise ValueError("gas composition has the wrong species")
+    values = [float(mapping[name]) for name in NAMES]
+    if min(values) < 0.0:
+        raise ValueError("gas amounts must be non-negative")
+    return values
+
+
+def calibrate(runs):
+    if not isinstance(runs, list) or not runs:
+        raise ValueError("calibration_runs must be a non-empty list")
+    MODEL["pressure_exponent"] = 2.0
+    MODEL["heat_capacity_scale"] = 1.0
+    MODEL["carbon_entropy_shift_j_mol_k"] = 0.0
+
+    pressure_values = []
+    heat_capacity_values = []
+    carbon_values = []
+    for run in runs:
+        kind = run.get("kind")
+        if kind == "pressure":
+            temperature = float(run["temperature_k"])
+            pressure = float(run["pressure_bar"])
+            moles = number_vector(run["gas_mol"])
+            total = sum(moles)
+            if abs(math.log(pressure)) < 1.0e-12 or min(moles) <= 0.0:
+                continue
+            base = math.log(moles[2] * moles[4] ** 3 / (moles[0] * moles[1]))
+            base -= 2.0 * math.log(total)
+            pressure_values.append(
+                (reaction_ln_k(0, temperature) - base) / math.log(pressure)
+            )
+        elif kind == "energy":
+            temperature = float(run["outlet_temperature_k"])
+            moles = number_vector(run["outlet_gas_mol"])
+            feed = {name: float(run["feed_mol"][name]) for name in NAMES}
+            inlet = float(run["inlet_temperature_k"])
+            inlet_h = feed_enthalpy(feed, inlet)
+            formation = sum(
+                moles[i] * SPECIES[NAMES[i]]["h_f_kj_mol"] * 1000.0
+                for i in range(6)
+            )
+            total_feed = sum(feed.values())
+            effective_cp = sum(
+                feed[name] * SPECIES[name]["cp_j_mol_k"] for name in NAMES
+            ) / total_feed
+            sensible = sum(moles) * effective_cp * (temperature - TREF)
+            if abs(sensible) > 1.0e-12:
+                heat_capacity_values.append((inlet_h - formation) / sensible)
+        elif kind == "carbon":
+            solid = float(run["solid_carbon_mol"])
+            if solid <= 1.0e-6:
+                carbon_values.append(0.0)
+                continue
+            temperature = float(run["temperature_k"])
+            pressure = float(run["pressure_bar"])
+            moles = number_vector(run["gas_mol"])
+            total = sum(moles)
+            if min(moles) <= 0.0:
+                continue
+            quotient = math.log(moles[2] ** 2 / (moles[3] * total)) + math.log(pressure)
+            carbon_values.append(R * (quotient - reaction_ln_k(2, temperature)))
+        else:
+            raise ValueError("unknown calibration run kind")
+
+    if not pressure_values or not heat_capacity_values or not carbon_values:
+        raise ValueError("calibration runs do not identify all model parameters")
+    return {
+        "pressure_exponent": statistics.mean(pressure_values),
+        "heat_capacity_scale": statistics.median(heat_capacity_values),
+        "carbon_entropy_shift_j_mol_k": statistics.mean(carbon_values),
+    }
+
+
+def build_bundle_report(payload):
+    runs = payload["calibration_runs"]
+    targets = payload["targets"]
+    if not isinstance(targets, dict) or set(targets) != {"pressure", "energy", "carbon"}:
+        raise ValueError("targets must contain pressure, energy and carbon")
+    fitted = calibrate(runs)
+    MODEL.update(fitted)
+    predictions = {
+        key: predict_one(targets[key])
+        for key in ("pressure", "energy", "carbon")
+    }
+    return {"calibration": fitted, "predictions": predictions}
+
+
 def main(argv):
     if len(argv) != 2:
         print("usage: python3 /app/main.py <request.json>", file=sys.stderr)
         return 2
     try:
         request = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
-        report = build_report(request)
+        report = build_bundle_report(request)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
