@@ -63,7 +63,7 @@ def run_bundle(name):
 
 
 def test_prints_exact_calibration_and_prediction_fields():
-    """「输出对象只含 `calibration` 和 `predictions` 两个字段」「`calibration` 只含三个字段」「`predictions` 固定含 `pressure`、`energy`、`carbon` 三个字段」"""
+    """「输出对象只含 `calibration` 和 `predictions` 两个字段」「`calibration` 只含三个字段」「`predictions` 下按 `pressure`、`energy`、`carbon` 三个目标分别给出结果」"""
     got = run_bundle("bundle-a")
     assert set(got) == {"calibration", "predictions"}
     assert set(got["calibration"]) == {
@@ -80,7 +80,7 @@ def test_wrong_argument_count_exits_2():
 
 
 def test_bundle_a_recovers_pressure_behavior():
-    """「压力系数用于还原高压运行中的气相平衡组成」「运行记录来自现场，不能删除或改写原始条目」"""
+    """「高压那组数据里的组成偏差，要先由压力系数来校正」「运行记录来自现场，不能删除或改写原始条目」"""
     got = run_bundle("bundle-a")
     assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-a"]["pressure_exponent"]) <= PARAM_TOL
     fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
@@ -89,7 +89,7 @@ def test_bundle_a_recovers_pressure_behavior():
 
 
 def test_bundle_b_recovers_pressure_behavior():
-    """「压力系数用于还原高压运行中的气相平衡组成」"""
+    """「高压那组数据里的组成偏差，要先由压力系数来校正」"""
     got = run_bundle("bundle-b")
     assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-b"]["pressure_exponent"]) <= PARAM_TOL
     fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
@@ -98,7 +98,7 @@ def test_bundle_b_recovers_pressure_behavior():
 
 
 def test_bundle_c_recovers_pressure_behavior():
-    """「压力系数用于还原高压运行中的气相平衡组成」"""
+    """「高压那组数据里的组成偏差，要先由压力系数来校正」"""
     got = run_bundle("bundle-c")
     assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-c"]["pressure_exponent"]) <= PARAM_TOL
     fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
@@ -107,21 +107,21 @@ def test_bundle_c_recovers_pressure_behavior():
 
 
 def test_bundle_a_recovers_heat_capacity_scale():
-    """「产物热容系数用于还原绝热出口温度」「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
+    """「绝热出口温度主要受产物热容系数影响」「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
     got = run_bundle("bundle-a")
     assert abs(got["calibration"]["heat_capacity_scale"] - EXPECTED["bundle-a"]["heat_capacity_scale"]) <= CP_TOL
     assert abs(got["predictions"]["energy"]["temperature_k"] - EXPECTED["bundle-a"]["energy_temperature_k"]) <= TEMPERATURE_TOL
 
 
 def test_bundle_b_recovers_heat_capacity_scale():
-    """「产物热容系数用于还原绝热出口温度」「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
+    """「绝热出口温度主要受产物热容系数影响」「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
     got = run_bundle("bundle-b")
     assert abs(got["calibration"]["heat_capacity_scale"] - EXPECTED["bundle-b"]["heat_capacity_scale"]) <= CP_TOL
     assert abs(got["predictions"]["energy"]["temperature_k"] - EXPECTED["bundle-b"]["energy_temperature_k"]) <= TEMPERATURE_TOL
 
 
 def test_bundle_c_recovers_heat_capacity_scale():
-    """「产物热容系数用于还原绝热出口温度」「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
+    """「绝热出口温度主要受产物热容系数影响」「绝热工况的出口温度必须使产物总焓等于进料总焓」"""
     got = run_bundle("bundle-c")
     assert abs(got["calibration"]["heat_capacity_scale"] - EXPECTED["bundle-c"]["heat_capacity_scale"]) <= CP_TOL
     assert abs(got["predictions"]["energy"]["temperature_k"] - EXPECTED["bundle-c"]["energy_temperature_k"]) <= TEMPERATURE_TOL
