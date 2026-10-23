@@ -12,8 +12,12 @@ from pathlib import Path
 
 REVERT = {
     "difficulty_1": (
-        '        "pressure_exponent": statistics.median(pressure_values),\n',
-        '        "pressure_exponent": statistics.mean(pressure_values),\n',
+        """    pressure_exponent = statistics.median(
+        value - pressure_slope * (temperature - 1000.0)
+        for temperature, value in pressure_samples
+    )
+""",
+        "    pressure_exponent = statistics.mean(value for _, value in pressure_samples)\n",
     ),
     "difficulty_2": (
         '        "heat_capacity_scale": statistics.median(heat_capacity_values),\n',
@@ -22,6 +26,10 @@ REVERT = {
     "difficulty_3": (
         '        "carbon_entropy_shift_j_mol_k": statistics.median(carbon_values),\n',
         '        "carbon_entropy_shift_j_mol_k": statistics.mean(carbon_values),\n',
+    ),
+    "difficulty_4": (
+        '        "pressure_exponent_slope_per_k": pressure_slope,\n',
+        '        "pressure_exponent_slope_per_k": 0.0,\n',
     ),
 }
 skip = [item for item in os.environ.get("SKIP", "").split(",") if item]

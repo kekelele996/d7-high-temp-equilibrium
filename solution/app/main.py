@@ -40,7 +40,7 @@ def load_thermo():
 
 
 THERMO, SPECIES, TREF = load_thermo()
-MODEL = {"pressure_exponent": 2.0, "heat_capacity_scale": 1.0, "carbon_entropy_shift_j_mol_k": 0.0}
+MODEL = {"pressure_exponent": 2.0, "pressure_exponent_slope_per_k": 0.0, "heat_capacity_scale": 1.0, "carbon_entropy_shift_j_mol_k": 0.0}
 
 
 def reaction_ln_k(index, temperature):
@@ -50,6 +50,13 @@ def reaction_ln_k(index, temperature):
     if index == 2:
         ds += MODEL["carbon_entropy_shift_j_mol_k"]
     return -dh / (R * temperature) + ds / R
+
+
+def effective_pressure_exponent(temperature):
+    return (
+        MODEL["pressure_exponent"]
+        + MODEL["pressure_exponent_slope_per_k"] * (temperature - 1000.0)
+    )
 
 
 def gas_moles(feed, extent_1, extent_2, solid):
@@ -74,7 +81,7 @@ def homogeneous_residuals(feed, temperature, pressure_bar, x1, x2, solid):
     if min(moles) <= 0.0:
         return None
     y = [value / total for value in moles]
-    pressure_log = MODEL["pressure_exponent"] * math.log(pressure_bar)
+    pressure_log = effective_pressure_exponent(temperature) * math.log(pressure_bar)
     reforming = (
         math.log(y[2] * y[4] ** 3 / (y[0] * y[1]))
         + pressure_log
@@ -355,10 +362,11 @@ def calibrate(runs):
     if not isinstance(runs, list) or not runs:
         raise ValueError("calibration_runs must be a non-empty list")
     MODEL["pressure_exponent"] = 2.0
+    MODEL["pressure_exponent_slope_per_k"] = 0.0
     MODEL["heat_capacity_scale"] = 1.0
     MODEL["carbon_entropy_shift_j_mol_k"] = 0.0
 
-    pressure_values = []
+    pressure_samples = []
     heat_capacity_values = []
     carbon_values = []
     for run in runs:
@@ -372,8 +380,8 @@ def calibrate(runs):
                 continue
             base = math.log(moles[2] * moles[4] ** 3 / (moles[0] * moles[1]))
             base -= 2.0 * math.log(total)
-            pressure_values.append(
-                (reaction_ln_k(0, temperature) - base) / math.log(pressure)
+            pressure_samples.append(
+                (temperature, (reaction_ln_k(0, temperature) - base) / math.log(pressure))
             )
         elif kind == "energy":
             temperature = required_number(run, "outlet_temperature_k", "energy run")
@@ -406,10 +414,24 @@ def calibrate(runs):
         else:
             raise ValueError("unknown calibration run kind")
 
-    if not pressure_values or not heat_capacity_values or not carbon_values:
+    if not pressure_samples or not heat_capacity_values or not carbon_values:
         raise ValueError("calibration runs do not identify all model parameters")
+    slopes = [
+        (right_value - left_value) / (right_temperature - left_temperature)
+        for left_temperature, left_value in pressure_samples
+        for right_temperature, right_value in pressure_samples
+        if right_temperature > left_temperature
+    ]
+    if not slopes:
+        raise ValueError("pressure calibration does not identify a temperature slope")
+    pressure_slope = statistics.median(slopes)
+    pressure_exponent = statistics.median(
+        value - pressure_slope * (temperature - 1000.0)
+        for temperature, value in pressure_samples
+    )
     return {
-        "pressure_exponent": statistics.median(pressure_values),
+        "pressure_exponent": pressure_exponent,
+        "pressure_exponent_slope_per_k": pressure_slope,
         "heat_capacity_scale": statistics.median(heat_capacity_values),
         "carbon_entropy_shift_j_mol_k": statistics.median(carbon_values),
     }

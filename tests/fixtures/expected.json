@@ -1,29 +1,38 @@
 {
   "bundle-a": {
     "pressure_exponent": 1.82,
+    "pressure_exponent_slope_per_k": 0.00035,
     "heat_capacity_scale": 1.13,
     "carbon_entropy_shift_j_mol_k": 8.0,
-    "pressure_ch4_fraction": 0.0036230335368906156,
-    "pressure_h2_fraction": 0.29179931062373243,
+    "pressure_ch4_fraction": 0.004234717754216251,
+    "pressure_h2_fraction": 0.2904471679304885,
     "energy_temperature_k": 842.2838772435234,
-    "carbon_solid_mol": 0.11342734939978663
+    "carbon_solid_mol": 0.11342734939978663,
+    "pressure_at_1000_ch4_fraction": 0.039561005515112976,
+    "pressure_at_1000_h2_fraction": 0.22849608162082682
   },
   "bundle-b": {
     "pressure_exponent": 1.82,
+    "pressure_exponent_slope_per_k": 0.00035,
     "heat_capacity_scale": 1.13,
     "carbon_entropy_shift_j_mol_k": 8.0,
-    "pressure_ch4_fraction": 0.00017154971307160928,
-    "pressure_h2_fraction": 0.3013764590605558,
+    "pressure_ch4_fraction": 0.0002686555003838187,
+    "pressure_h2_fraction": 0.3011612156621788,
     "energy_temperature_k": 871.5364556424054,
-    "carbon_solid_mol": 0.11114277880318296
+    "carbon_solid_mol": 0.11114277880318296,
+    "pressure_at_1000_ch4_fraction": 0.053469458493699516,
+    "pressure_at_1000_h2_fraction": 0.21646421603257424
   },
   "bundle-c": {
     "pressure_exponent": 1.82,
+    "pressure_exponent_slope_per_k": 0.00035,
     "heat_capacity_scale": 1.13,
     "carbon_entropy_shift_j_mol_k": 8.0,
-    "pressure_ch4_fraction": 0.0006020797114183153,
-    "pressure_h2_fraction": 0.21999523089261327,
+    "pressure_ch4_fraction": 0.000715638240589055,
+    "pressure_h2_fraction": 0.2197165782950568,
     "energy_temperature_k": 906.3614854345203,
-    "carbon_solid_mol": 0.07727223824056267
+    "carbon_solid_mol": 0.07727223824056267,
+    "pressure_at_1000_ch4_fraction": 0.01340298153322892,
+    "pressure_at_1000_h2_fraction": 0.20383183843429933
   }
 }

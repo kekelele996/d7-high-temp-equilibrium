@@ -8,9 +8,13 @@
 
 `calibration_runs` 是一个非空数组。每个元素按 `kind` 分三类：
 
-- `pressure`：等温高压运行，含 `pressure_bar`、`temperature_k`、`feed_mol`、`gas_mol`、`solid_carbon_mol`。
-- `energy`：常压绝热运行，含 `inlet_temperature_k`、`feed_mol`、`outlet_temperature_k`、`outlet_gas_mol`。
-- `carbon`：等温析碳运行，含 `pressure_bar`、`temperature_k`、`feed_mol`、`gas_mol`、`solid_carbon_mol`。
+三类运行都用同一套物种顺序。字段如下：
+
+```text
+pressure: pressure_bar, temperature_k, feed_mol, gas_mol, solid_carbon_mol
+energy: inlet_temperature_k, feed_mol, outlet_temperature_k, outlet_gas_mol
+carbon: pressure_bar, temperature_k, feed_mol, gas_mol, solid_carbon_mol
+```
 
 各 `feed_mol`、`gas_mol`、`outlet_gas_mol` 都只含 `CH4`、`H2O`、`CO`、`CO2`、`H2`、`N2` 六个键，单位都是 mol。运行记录来自现场，不能删除或改写原始条目。
 
@@ -18,17 +22,20 @@
 
 输出对象只含 `calibration` 和 `predictions` 两个字段。
 
-`calibration` 只含三个字段：
+`calibration` 只含四个字段：
 
-- `pressure_exponent`：重整反应压力项的有效指数，无量纲。
-- `heat_capacity_scale`：产物气相显焓的乘性系数，无量纲。
-- `carbon_entropy_shift_j_mol_k`：固碳标准熵的有效加性修正，单位 J mol⁻¹ K⁻¹。
+```text
+pressure_exponent: 1000 K 的有效压力指数，无量纲
+pressure_exponent_slope_per_k: 压力指数随温度的变化率，单位 K^-1
+heat_capacity_scale: 产物气相显焓的乘性系数，无量纲
+carbon_entropy_shift_j_mol_k: 固碳标准熵的加性修正，单位 J mol^-1 K^-1
+```
 
 `predictions` 下按 `pressure`、`energy`、`carbon` 三个目标分别给出结果，键名与 `targets` 一致。每个目标结果只放 `temperature_k`、`gas_mol`、`gas_mole_fractions`、`solid_carbon_mol` 四项。`gas_mol` 和 `gas_mole_fractions` 的键与 `feed_mol` 相同，摩尔分数六项之和为 1。
 
 ## 计算口径
 
-高压那组数据里的组成偏差，要先由压力系数来校正；系数不对，后面的预测会一起偏。绝热出口温度主要受产物热容系数影响。固碳项必须与实测固碳量和气相组成同时一致。
+高压那组数据里的组成偏差，要先由压力系数来校正；系数不对，后面的预测会一起偏。不同温度下的压力记录会给出不同指数，变化率要从整批记录一起算。绝热出口温度主要受产物热容系数影响。固碳项必须与实测固碳量和气相组成同时一致。
 
 热力学基础数据固定使用 `/app/data/thermo.json`，不要改写。以 1 bar 为标准压力，所有气相按理想气体处理，固碳按活度为 1 的纯固相处理。反应器是封闭系统，碳、氢、氧、氮的元素总量在反应前后保持不变。
 
@@ -42,7 +49,7 @@
 
 ## 交接要求
 
-现场记录原样交过来。没人先替我们圈掉坏点。哪条读数飘了，只能从同批数据的相互矛盾里看出来。系数定好后，压力、绝热、析碳三个目标共用它，别给每个目标单独开小灶。交班表上还要能对上元素守恒、相平衡和能量衡算，对不上就退回重做。
+现场记录什么样就交什么样，我们不替算法挑样本。读数一跳，先跟同一批的其它运行对一遍，看看是仪表的问题还是模型偏了。系数落定后，三个目标共用它。最后把元素守恒、相平衡和能量衡算都过一遍，哪条过不去就把单子退回。
 
 
 ```text

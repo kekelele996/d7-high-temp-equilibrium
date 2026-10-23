@@ -19,7 +19,9 @@ CANDIDATE_ENV = {
 CALL_TIMEOUT_SEC = 180
 FIXTURES = Path(__file__).with_name("fixtures")
 EXPECTED = json.loads((FIXTURES / "expected.json").read_text(encoding="utf-8"))
-PARAM_TOL = 1.0e-2
+PARAM_TOL = 8.0e-3
+SLOPE_TOL = 2.0e-5
+FRACTION_TOL_D4 = 1.0e-2
 CP_TOL = 5.0e-3
 ENTROPY_TOL = 0.2
 FRACTION_TOL = 2.0e-5
@@ -50,12 +52,15 @@ def run_candidate(*args, timeout=CALL_TIMEOUT_SEC):
     return subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
 
 
-def run_bundle(name):
+def run_bundle(name, pressure_temperature=None):
     source = FIXTURES / f"{name}.json"
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if pressure_temperature is not None:
+        payload["targets"]["pressure"]["temperature_k"] = pressure_temperature
     folder = Path(tempfile.mkdtemp(prefix="calibration-"))
     folder.chmod(0o755)
     case = folder / "request.json"
-    case.write_bytes(source.read_bytes())
+    case.write_text(json.dumps(payload), encoding="utf-8")
     case.chmod(0o644)
     proc = run_candidate(case)
     assert proc.returncode == 0, f"exit={proc.returncode} stderr={proc.stderr[-500:]}"
@@ -63,11 +68,12 @@ def run_bundle(name):
 
 
 def test_prints_exact_calibration_and_prediction_fields():
-    """「输出对象只含 `calibration` 和 `predictions` 两个字段」「`calibration` 只含三个字段」「`predictions` 下按 `pressure`、`energy`、`carbon` 三个目标分别给出结果」"""
+    """「输出对象只含 `calibration` 和 `predictions` 两个字段」「`calibration` 只含四个字段」「`predictions` 下按 `pressure`、`energy`、`carbon` 三个目标分别给出结果」"""
     got = run_bundle("bundle-a")
     assert set(got) == {"calibration", "predictions"}
     assert set(got["calibration"]) == {
-        "pressure_exponent", "heat_capacity_scale", "carbon_entropy_shift_j_mol_k"
+        "pressure_exponent", "pressure_exponent_slope_per_k",
+        "heat_capacity_scale", "carbon_entropy_shift_j_mol_k"
     }
     assert set(got["predictions"]) == {"pressure", "energy", "carbon"}
 
@@ -81,29 +87,56 @@ def test_wrong_argument_count_exits_2():
 
 def test_bundle_a_recovers_pressure_behavior():
     """「高压那组数据里的组成偏差，要先由压力系数来校正」「运行记录来自现场，不能删除或改写原始条目」"""
-    got = run_bundle("bundle-a")
+    got = run_bundle("bundle-a", pressure_temperature=1000.0)
     assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-a"]["pressure_exponent"]) <= PARAM_TOL
     fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
-    assert abs(fractions["CH4"] - EXPECTED["bundle-a"]["pressure_ch4_fraction"]) <= FRACTION_TOL
-    assert abs(fractions["H2"] - EXPECTED["bundle-a"]["pressure_h2_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["CH4"] - EXPECTED["bundle-a"]["pressure_at_1000_ch4_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["H2"] - EXPECTED["bundle-a"]["pressure_at_1000_h2_fraction"]) <= FRACTION_TOL
 
 
 def test_bundle_b_recovers_pressure_behavior():
-    """「高压那组数据里的组成偏差，要先由压力系数来校正」"""
-    got = run_bundle("bundle-b")
+    """「高压那组数据里的组成偏差，要先由压力系数来校正」「运行记录来自现场，不能删除或改写原始条目」"""
+    got = run_bundle("bundle-b", pressure_temperature=1000.0)
     assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-b"]["pressure_exponent"]) <= PARAM_TOL
     fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
-    assert abs(fractions["CH4"] - EXPECTED["bundle-b"]["pressure_ch4_fraction"]) <= FRACTION_TOL
-    assert abs(fractions["H2"] - EXPECTED["bundle-b"]["pressure_h2_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["CH4"] - EXPECTED["bundle-b"]["pressure_at_1000_ch4_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["H2"] - EXPECTED["bundle-b"]["pressure_at_1000_h2_fraction"]) <= FRACTION_TOL
 
 
 def test_bundle_c_recovers_pressure_behavior():
-    """「高压那组数据里的组成偏差，要先由压力系数来校正」"""
-    got = run_bundle("bundle-c")
+    """「高压那组数据里的组成偏差，要先由压力系数来校正」「运行记录来自现场，不能删除或改写原始条目」"""
+    got = run_bundle("bundle-c", pressure_temperature=1000.0)
     assert abs(got["calibration"]["pressure_exponent"] - EXPECTED["bundle-c"]["pressure_exponent"]) <= PARAM_TOL
     fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
-    assert abs(fractions["CH4"] - EXPECTED["bundle-c"]["pressure_ch4_fraction"]) <= FRACTION_TOL
-    assert abs(fractions["H2"] - EXPECTED["bundle-c"]["pressure_h2_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["CH4"] - EXPECTED["bundle-c"]["pressure_at_1000_ch4_fraction"]) <= FRACTION_TOL
+    assert abs(fractions["H2"] - EXPECTED["bundle-c"]["pressure_at_1000_h2_fraction"]) <= FRACTION_TOL
+
+
+def test_bundle_a_recovers_pressure_temperature_slope():
+    """「不同温度下的压力记录会给出不同指数，变化率要从整批记录一起算」"""
+    got = run_bundle("bundle-a")
+    assert abs(got["calibration"]["pressure_exponent_slope_per_k"] - EXPECTED["bundle-a"]["pressure_exponent_slope_per_k"]) <= SLOPE_TOL
+    fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
+    assert abs(fractions["CH4"] - EXPECTED["bundle-a"]["pressure_ch4_fraction"]) <= FRACTION_TOL_D4
+    assert abs(fractions["H2"] - EXPECTED["bundle-a"]["pressure_h2_fraction"]) <= FRACTION_TOL_D4
+
+
+def test_bundle_b_recovers_pressure_temperature_slope():
+    """「不同温度下的压力记录会给出不同指数，变化率要从整批记录一起算」"""
+    got = run_bundle("bundle-b")
+    assert abs(got["calibration"]["pressure_exponent_slope_per_k"] - EXPECTED["bundle-b"]["pressure_exponent_slope_per_k"]) <= SLOPE_TOL
+    fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
+    assert abs(fractions["CH4"] - EXPECTED["bundle-b"]["pressure_ch4_fraction"]) <= FRACTION_TOL_D4
+    assert abs(fractions["H2"] - EXPECTED["bundle-b"]["pressure_h2_fraction"]) <= FRACTION_TOL_D4
+
+
+def test_bundle_c_recovers_pressure_temperature_slope():
+    """「不同温度下的压力记录会给出不同指数，变化率要从整批记录一起算」"""
+    got = run_bundle("bundle-c")
+    assert abs(got["calibration"]["pressure_exponent_slope_per_k"] - EXPECTED["bundle-c"]["pressure_exponent_slope_per_k"]) <= SLOPE_TOL
+    fractions = got["predictions"]["pressure"]["gas_mole_fractions"]
+    assert abs(fractions["CH4"] - EXPECTED["bundle-c"]["pressure_ch4_fraction"]) <= FRACTION_TOL_D4
+    assert abs(fractions["H2"] - EXPECTED["bundle-c"]["pressure_h2_fraction"]) <= FRACTION_TOL_D4
 
 
 def test_bundle_a_recovers_heat_capacity_scale():
