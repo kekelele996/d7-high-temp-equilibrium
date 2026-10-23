@@ -424,16 +424,46 @@ def calibrate(runs):
     ]
     if not slopes:
         raise ValueError("pressure calibration does not identify a temperature slope")
+    slope_center = statistics.median(slopes)
+    deviations = [abs(value - slope_center) for value in slopes]
+    mad = statistics.median(deviations)
+    if mad > 0.0:
+        cutoff = 3.0 * 1.4826 * mad
+        inliers = [value for value in slopes if abs(value - slope_center) <= cutoff]
+        if inliers:
+            slopes = inliers
     pressure_slope = statistics.median(slopes)
+    intercept_slopes = [
+        (right_value - left_value) / (right_temperature - left_temperature)
+        for left_temperature, left_value in pressure_samples
+        for right_temperature, right_value in pressure_samples
+        if right_temperature > left_temperature
+    ]
+    if not intercept_slopes:
+        raise ValueError("pressure calibration does not identify a temperature slope")
+    intercept_center = statistics.median(intercept_slopes)
+    intercept_deviations = [abs(value - intercept_center) for value in intercept_slopes]
+    intercept_mad = statistics.median(intercept_deviations)
+    if intercept_mad > 0.0:
+        intercept_cutoff = 3.0 * 1.4826 * intercept_mad
+        intercept_inliers = [
+            value for value in intercept_slopes
+            if abs(value - intercept_center) <= intercept_cutoff
+        ]
+        if intercept_inliers:
+            intercept_slopes = intercept_inliers
+    intercept_slope = statistics.median(intercept_slopes)
     pressure_exponent = statistics.median(
-        value - pressure_slope * (temperature - 1000.0)
+        value - intercept_slope * (temperature - 1000.0)
         for temperature, value in pressure_samples
     )
+    heat_capacity_scale = statistics.median(heat_capacity_values)
+    carbon_entropy_shift = statistics.median(carbon_values)
     return {
         "pressure_exponent": pressure_exponent,
         "pressure_exponent_slope_per_k": pressure_slope,
-        "heat_capacity_scale": statistics.median(heat_capacity_values),
-        "carbon_entropy_shift_j_mol_k": statistics.median(carbon_values),
+        "heat_capacity_scale": heat_capacity_scale,
+        "carbon_entropy_shift_j_mol_k": carbon_entropy_shift,
     }
 
 

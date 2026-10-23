@@ -316,6 +316,48 @@ def number_vector(mapping):
     return values
 
 
+def required_number(mapping, key, label):
+    value = mapping.get(key)
+    if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise ValueError(f"{label}.{key} must be finite")
+    return float(value)
+
+
+def required_species_map(mapping, label):
+    if not isinstance(mapping, dict) or set(mapping) != set(NAMES):
+        raise ValueError(f"{label} has the wrong species")
+    values = {}
+    for name in NAMES:
+        values[name] = required_number(mapping, name, label)
+        if values[name] < 0.0:
+            raise ValueError(f"{label}.{name} must be non-negative")
+    return values
+
+
+def validate_calibration_run(run):
+    if not isinstance(run, dict):
+        raise ValueError("calibration run must be an object")
+    kind = run.get("kind")
+    if kind not in {"pressure", "energy", "carbon"}:
+        raise ValueError("unknown calibration run kind")
+    required_species_map(run.get("feed_mol"), "feed_mol")
+    if kind == "pressure":
+        required_number(run, "pressure_bar", "pressure run")
+        required_number(run, "temperature_k", "pressure run")
+        required_species_map(run.get("gas_mol"), "gas_mol")
+        required_number(run, "solid_carbon_mol", "pressure run")
+    elif kind == "energy":
+        required_number(run, "inlet_temperature_k", "energy run")
+        required_number(run, "outlet_temperature_k", "energy run")
+        required_species_map(run.get("outlet_gas_mol"), "outlet_gas_mol")
+    else:
+        required_number(run, "pressure_bar", "carbon run")
+        required_number(run, "temperature_k", "carbon run")
+        required_species_map(run.get("gas_mol"), "gas_mol")
+        required_number(run, "solid_carbon_mol", "carbon run")
+    return kind
+
+
 def calibrate(runs):
     if not isinstance(runs, list) or not runs:
         raise ValueError("calibration_runs must be a non-empty list")
@@ -328,10 +370,10 @@ def calibrate(runs):
     heat_capacity_values = []
     carbon_values = []
     for run in runs:
-        kind = run.get("kind")
+        kind = validate_calibration_run(run)
         if kind == "pressure":
-            temperature = float(run["temperature_k"])
-            pressure = float(run["pressure_bar"])
+            temperature = required_number(run, "temperature_k", "pressure run")
+            pressure = required_number(run, "pressure_bar", "pressure run")
             moles = number_vector(run["gas_mol"])
             total = sum(moles)
             if abs(math.log(pressure)) < 1.0e-12 or min(moles) <= 0.0:
@@ -342,10 +384,10 @@ def calibrate(runs):
                 (temperature, (reaction_ln_k(0, temperature) - base) / math.log(pressure))
             )
         elif kind == "energy":
-            temperature = float(run["outlet_temperature_k"])
+            temperature = required_number(run, "outlet_temperature_k", "energy run")
             moles = number_vector(run["outlet_gas_mol"])
-            feed = {name: float(run["feed_mol"][name]) for name in NAMES}
-            inlet = float(run["inlet_temperature_k"])
+            feed = required_species_map(run["feed_mol"], "feed_mol")
+            inlet = required_number(run, "inlet_temperature_k", "energy run")
             inlet_h = feed_enthalpy(feed, inlet)
             formation = sum(
                 moles[i] * SPECIES[NAMES[i]]["h_f_kj_mol"] * 1000.0
@@ -358,11 +400,11 @@ def calibrate(runs):
             if abs(sensible) > 1.0e-12:
                 heat_capacity_values.append((inlet_h - formation) / sensible)
         elif kind == "carbon":
-            solid = float(run["solid_carbon_mol"])
+            solid = required_number(run, "solid_carbon_mol", "carbon run")
             if solid <= 1.0e-6:
                 continue
-            temperature = float(run["temperature_k"])
-            pressure = float(run["pressure_bar"])
+            temperature = required_number(run, "temperature_k", "carbon run")
+            pressure = required_number(run, "pressure_bar", "carbon run")
             moles = number_vector(run["gas_mol"])
             total = sum(moles)
             if min(moles) <= 0.0:
@@ -374,12 +416,21 @@ def calibrate(runs):
 
     if not pressure_samples or not heat_capacity_values or not carbon_values:
         raise ValueError("calibration runs do not identify all model parameters")
+    pressure_slope = 0.0
+    for index in range(len(pressure_samples) - 1):
+        left_temperature, left_value = pressure_samples[index]
+        right_temperature, right_value = pressure_samples[index + 1]
+        if right_temperature != left_temperature:
+            pressure_slope = (right_value - left_value) / (right_temperature - left_temperature)
+            break
     pressure_exponent = statistics.mean(value for _, value in pressure_samples)
+    heat_capacity_scale = statistics.mean(heat_capacity_values)
+    carbon_entropy_shift = statistics.mean(carbon_values)
     return {
         "pressure_exponent": pressure_exponent,
-        "pressure_exponent_slope_per_k": 0.0,
-        "heat_capacity_scale": statistics.mean(heat_capacity_values),
-        "carbon_entropy_shift_j_mol_k": statistics.mean(carbon_values),
+        "pressure_exponent_slope_per_k": pressure_slope,
+        "heat_capacity_scale": heat_capacity_scale,
+        "carbon_entropy_shift_j_mol_k": carbon_entropy_shift,
     }
 
 
