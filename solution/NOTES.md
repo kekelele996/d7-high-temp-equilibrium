@@ -45,6 +45,8 @@
 
 ## 权重依据
 
+权重策略为 `business_priority`，按业务风险而不是测试条数分配；`scoring.json` 显式声明 `sum_to_one` 归一化。
+
 - gate 不计分：只检查输出结构和参数错误。
 - difficulty_1 合计 `0.30`：1000 K 压力指数决定高压组成。
 - difficulty_2 合计 `0.25`：绝热温度独立受产物热容系数控制。

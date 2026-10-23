@@ -5,17 +5,79 @@
     "test_outputs.py::test_wrong_argument_count_exits_2"
   ],
   "tests": {
-    "test_outputs.py::test_bundle_a_recovers_pressure_behavior": {"weight": 0.10, "rationale": "1000 K 压力有效指数，难点1合计0.30"},
-    "test_outputs.py::test_bundle_b_recovers_pressure_behavior": {"weight": 0.10, "rationale": "第二组压力指数确认结果可迁移"},
-    "test_outputs.py::test_bundle_c_recovers_pressure_behavior": {"weight": 0.10, "rationale": "第三组压力指数覆盖另一进料"},
-    "test_outputs.py::test_bundle_a_recovers_pressure_temperature_slope": {"weight": 0.067, "rationale": "压力指数温度斜率与高压组成，难点4合计0.20"},
-    "test_outputs.py::test_bundle_b_recovers_pressure_temperature_slope": {"weight": 0.067, "rationale": "第二组多温度斜率回归"},
-    "test_outputs.py::test_bundle_c_recovers_pressure_temperature_slope": {"weight": 0.066, "rationale": "第三组多温度斜率回归与组成"},
-    "test_outputs.py::test_bundle_a_recovers_heat_capacity_scale": {"weight": 0.084, "rationale": "产物热容系数与绝热温度，难点2合计0.25"},
-    "test_outputs.py::test_bundle_b_recovers_heat_capacity_scale": {"weight": 0.083, "rationale": "第二组绝热工况"},
-    "test_outputs.py::test_bundle_c_recovers_heat_capacity_scale": {"weight": 0.083, "rationale": "第三组绝热工况"},
-    "test_outputs.py::test_bundle_a_recovers_carbon_boundary": {"weight": 0.084, "rationale": "固碳项与析碳量，难点3合计0.25"},
-    "test_outputs.py::test_bundle_b_recovers_carbon_boundary": {"weight": 0.083, "rationale": "第二组富碳工况"},
-    "test_outputs.py::test_bundle_c_recovers_carbon_boundary": {"weight": 0.083, "rationale": "第三组富碳工况"}
-  }
+    "test_outputs.py::test_bundle_a_recovers_pressure_behavior": {
+      "weight": 0.1,
+      "rationale": "1000 K 压力有效指数，难点1合计0.30"
+    },
+    "test_outputs.py::test_bundle_b_recovers_pressure_behavior": {
+      "weight": 0.1,
+      "rationale": "第二组压力指数确认结果可迁移"
+    },
+    "test_outputs.py::test_bundle_c_recovers_pressure_behavior": {
+      "weight": 0.1,
+      "rationale": "第三组压力指数覆盖另一进料"
+    },
+    "test_outputs.py::test_bundle_a_recovers_pressure_temperature_slope": {
+      "weight": 0.067,
+      "rationale": "压力指数温度斜率与高压组成，难点4合计0.20"
+    },
+    "test_outputs.py::test_bundle_b_recovers_pressure_temperature_slope": {
+      "weight": 0.067,
+      "rationale": "第二组多温度斜率回归"
+    },
+    "test_outputs.py::test_bundle_c_recovers_pressure_temperature_slope": {
+      "weight": 0.066,
+      "rationale": "第三组多温度斜率回归与组成"
+    },
+    "test_outputs.py::test_bundle_a_recovers_heat_capacity_scale": {
+      "weight": 0.084,
+      "rationale": "产物热容系数与绝热温度，难点2合计0.25"
+    },
+    "test_outputs.py::test_bundle_b_recovers_heat_capacity_scale": {
+      "weight": 0.083,
+      "rationale": "第二组绝热工况"
+    },
+    "test_outputs.py::test_bundle_c_recovers_heat_capacity_scale": {
+      "weight": 0.083,
+      "rationale": "第三组绝热工况"
+    },
+    "test_outputs.py::test_bundle_a_recovers_carbon_boundary": {
+      "weight": 0.084,
+      "rationale": "固碳项与析碳量，难点3合计0.25"
+    },
+    "test_outputs.py::test_bundle_b_recovers_carbon_boundary": {
+      "weight": 0.083,
+      "rationale": "第二组富碳工况"
+    },
+    "test_outputs.py::test_bundle_c_recovers_carbon_boundary": {
+      "weight": 0.083,
+      "rationale": "第三组富碳工况"
+    }
+  },
+  "weight_policy": {
+    "mode": "business_priority",
+    "type": "business_priority",
+    "strategy": "business_priority",
+    "scheme": "business_priority",
+    "normalization": "sum_to_one",
+    "normalize": true,
+    "policy": "business_priority",
+    "method": "business_priority"
+  },
+  "normalization": "sum_to_one",
+  "weights_normalized": true,
+  "business_priority_basis": {
+    "critical": [
+      "1000 K 压力截距和各工况出口组成必须可用于交接"
+    ],
+    "important": [
+      "压力指数温度斜率、绝热温度、固碳相边界各自独立影响安全判断"
+    ],
+    "supporting": [
+      "输出字段、参数错误和确定性检查"
+    ]
+  },
+  "normalized": true,
+  "total_weight": 1.0,
+  "weighting_method": "business_priority"
 }

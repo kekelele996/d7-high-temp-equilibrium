@@ -139,6 +139,14 @@ def case_id(node: ET.Element) -> str:
 
 def summarize(config_path: Path, junit: Path, report_out: Path, reward_out: Path) -> int:
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    policy = config.get("weight_policy")
+    policy_mode = policy.get("mode") if isinstance(policy, dict) else policy
+    if policy_mode != "business_priority":
+        print("incomplete: weight_policy must be business_priority", file=sys.stderr)
+        return 2
+    if config.get("normalization") != "sum_to_one":
+        print("incomplete: normalization must be sum_to_one", file=sys.stderr)
+        return 2
     gates = list(config["gate_tests"])
     weights = {key: float(value["weight"]) for key, value in config["tests"].items()}
     outcomes = {}
