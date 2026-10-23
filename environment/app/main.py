@@ -78,7 +78,7 @@ def gas_moles(feed, extent_1, extent_2, solid):
 def homogeneous_residuals(feed, temperature, pressure_bar, x1, x2, solid):
     moles = gas_moles(feed, x1, x2, solid)
     total = sum(moles)
-    if min(moles) <= 0.0:
+    if not min(moles) > 0.0:
         return None
     y = [value / total for value in moles]
     pressure_log = effective_pressure_exponent(temperature) * math.log(pressure_bar)
@@ -101,7 +101,7 @@ def solve_shift_extent(feed, temperature, pressure_bar, x1, solid):
     eps = span * 1.0e-12
     lower += eps
     upper -= eps
-    if lower >= upper:
+    if not lower < upper:
         return None
     left = homogeneous_residuals(feed, temperature, pressure_bar, x1, lower, solid)
     right = homogeneous_residuals(feed, temperature, pressure_bar, x1, upper, solid)
@@ -136,7 +136,7 @@ def solve_extents(feed, temperature, pressure_bar, solid):
             previous = None
             continue
         current = (x1, value[1])
-        if previous is not None and current[1] * previous[1] <= 0.0:
+        if previous is not None and not current[1] * previous[1] > 0.0:
             bracket = (previous[0], current[0])
             break
         previous = current
@@ -162,7 +162,7 @@ def solve_extents(feed, temperature, pressure_bar, solid):
 def carbon_drive(feed, temperature, pressure_bar, x1, x2, solid):
     moles = gas_moles(feed, x1, x2, solid)
     total = sum(moles)
-    if min(moles) <= 0.0:
+    if not min(moles) > 0.0:
         return None
     drive = (
         math.log(moles[2] ** 2 / (moles[3] * total))
@@ -175,7 +175,7 @@ def carbon_drive(feed, temperature, pressure_bar, x1, x2, solid):
 def settle_solid_carbon(feed, temperature, pressure_bar):
     base_extents = solve_extents(feed, temperature, pressure_bar, 0.0)
     base_drive = carbon_drive(feed, temperature, pressure_bar, *base_extents, 0.0)
-    if base_drive is None or base_drive <= 0.0:
+    if base_drive is None or not base_drive > 0.0:
         return base_extents[0], base_extents[1], 0.0
 
     carbon_total = feed["CH4"] + feed["CO"] + feed["CO2"]
@@ -193,7 +193,7 @@ def settle_solid_carbon(feed, temperature, pressure_bar):
         if drive is None:
             previous = None
             continue
-        if drive <= 0.0:
+        if not drive > 0.0:
             if previous is not None:
                 bracket = (previous[0], solid)
                 break
@@ -267,7 +267,7 @@ def validate(request):
     if request.get("mode") not in {"isothermal", "adiabatic"}:
         raise ValueError("unsupported mode")
     pressure = request.get("pressure_bar")
-    if not isinstance(pressure, (int, float)) or pressure <= 0.0:
+    if not isinstance(pressure, (int, float)) or not pressure > 0.0:
         raise ValueError("pressure must be positive")
     feed = request.get("feed_mol")
     if not isinstance(feed, dict) or set(feed) != set(NAMES):
@@ -278,7 +278,7 @@ def validate(request):
         if not isinstance(value, (int, float)) or value < 0.0:
             raise ValueError("feed amounts must be non-negative")
         values[name] = float(value)
-    if sum(values.values()) <= 0.0:
+    if not sum(values.values()) > 0.0:
         raise ValueError("feed is empty")
     return request["mode"], float(pressure), values
 
@@ -287,12 +287,12 @@ def predict_one(request):
     mode, pressure, feed = validate(request)
     if mode == "isothermal":
         temperature = request.get("temperature_k")
-        if not isinstance(temperature, (int, float)) or temperature <= 0.0:
+        if not isinstance(temperature, (int, float)) or not temperature > 0.0:
             raise ValueError("temperature must be positive")
         temperature = float(temperature)
     else:
         inlet = request.get("inlet_temperature_k")
-        if not isinstance(inlet, (int, float)) or inlet <= 0.0:
+        if not isinstance(inlet, (int, float)) or not inlet > 0.0:
             raise ValueError("inlet temperature must be positive")
         temperature = adiabatic_temperature(feed, float(inlet), pressure)
     x1, x2, solid = solve_equilibrium(feed, temperature, pressure)
@@ -376,7 +376,7 @@ def calibrate(runs):
             pressure = required_number(run, "pressure_bar", "pressure run")
             moles = number_vector(run["gas_mol"])
             total = sum(moles)
-            if abs(math.log(pressure)) < 1.0e-12 or min(moles) <= 0.0:
+            if abs(math.log(pressure)) < 1.0e-12 or not min(moles) > 0.0:
                 continue
             base = math.log(moles[2] * moles[4] ** 3 / (moles[0] * moles[1]))
             base -= 2.0 * math.log(total)
@@ -401,13 +401,13 @@ def calibrate(runs):
                 heat_capacity_values.append((inlet_h - formation) / sensible)
         elif kind == "carbon":
             solid = required_number(run, "solid_carbon_mol", "carbon run")
-            if solid <= 1.0e-6:
+            if not solid > 1.0e-6:
                 continue
             temperature = required_number(run, "temperature_k", "carbon run")
             pressure = required_number(run, "pressure_bar", "carbon run")
             moles = number_vector(run["gas_mol"])
             total = sum(moles)
-            if min(moles) <= 0.0:
+            if not min(moles) > 0.0:
                 continue
             quotient = math.log(moles[2] ** 2 / (moles[3] * total)) + math.log(pressure)
             carbon_values.append(R * (quotient - reaction_ln_k(2, temperature)))
